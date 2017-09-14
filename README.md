@@ -14,5 +14,5 @@ demo cases:
 @misc{mockamap,
   author = "William.Wu",
   title = "mockamap",
-  howpublished = "\url{https://github.com/HKUST-Aerial-Robotics/mockamap}",
+  howpublished = "\url{https://github.com/HKUST-Aerial-Robotics/mockamap }",
 }
