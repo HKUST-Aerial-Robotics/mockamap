@@ -5,10 +5,58 @@
 #include <iostream>
 #include <vector>
 
+#include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/point_cloud.h>
 #include <pcl_conversions/pcl_conversions.h>
 
 #include "maps.hpp"
+
+void
+optimizeMap(mocka::Maps::BasicInfo& in)
+{
+  std::vector<int>* temp = new std::vector<int>;
+
+  pcl::KdTreeFLANN<pcl::PointXYZ>     kdtree;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+
+  cloud->width  = in.cloud->width;
+  cloud->height = in.cloud->height;
+  cloud->points.resize(cloud->width * cloud->height);
+
+  for (int i = 0; i < cloud->width; i++)
+  {
+    cloud->points[i].x = in.cloud->points[i].x;
+    cloud->points[i].y = in.cloud->points[i].y;
+    cloud->points[i].z = in.cloud->points[i].z;
+  }
+
+  kdtree.setInputCloud(cloud);
+  double radius = 1.75 / in.scale; // 1.75 is the rounded up value of sqrt(3)
+
+  for (int i = 0; i < cloud->width; i++)
+  {
+    std::vector<int>   pointIdxRadiusSearch;
+    std::vector<float> pointRadiusSquaredDistance;
+
+    if (kdtree.radiusSearch(cloud->points[i], radius, pointIdxRadiusSearch,
+                            pointRadiusSquaredDistance) >= 27)
+    {
+      temp->push_back(i);
+    }
+  }
+  for (int i = temp->size() - 1; i >= 0; i--)
+  {
+    in.cloud->points.erase(in.cloud->points.begin() +
+                           temp->at(i)); // erasing the enclosed points
+  }
+  in.cloud->width -= temp->size();
+
+  pcl::toROSMsg(*in.cloud, *in.output);
+  in.output->header.frame_id = "map";
+  ROS_INFO("finish: number of points after optimization %d", in.cloud->width);
+  delete temp;
+  return;
+}
 
 int
 main(int argc, char** argv)
@@ -61,6 +109,8 @@ main(int argc, char** argv)
   mocka::Maps map;
   map.setInfo(info);
   map.generate(type);
+
+  //  optimizeMap(info);
 
   //! @note publish loop
   ros::Rate loop_rate(update_freq);
